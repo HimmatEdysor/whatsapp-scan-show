@@ -1,0 +1,38 @@
+{
+  "name": "whatsapp-scan-show",
+  "version": "1.0.0",
+  "description": "WhatsApp QR Scanner and Message Display UI",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "type-check": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "docker:build": "docker build -t whatsapp-scan-show .",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f whatsapp-app"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "next": "^14.0.0",
+    "axios": "^1.6.0",
+    "qrcode.react": "^1.0.1",
+    "lucide-react": "^0.292.0",
+    "framer-motion": "^10.16.0",
+    "tailwindcss": "^3.3.0",
+    "autoprefixer": "^10.4.16"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.2",
+    "@types/react": "^18.2.31",
+    "@types/node": "^20.8.0",
+    "postcss": "^8.4.31"
+  }
+}

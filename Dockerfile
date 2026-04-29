@@ -1,0 +1,26 @@
+# Use official Node.js runtime as base image
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy application files
+COPY . .
+
+# Build Next.js application
+RUN npm run build
+
+# Expose port
+EXPOSE 3000
+
+# Set environment
+ENV NODE_ENV=production
+
+# Start application
+CMD ["npm", "start"]

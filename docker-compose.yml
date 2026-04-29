@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  whatsapp-app:
+    build: .
+    container_name: whatsapp-scan-show
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_WUZ_API_BASE_URL=${WUZ_API_BASE_URL:-https://wuzapi.guaranteeadmit.com}
+      - WUZ_API_KEY=${WUZ_API_KEY}
+    restart: unless-stopped
+    networks:
+      - whatsapp-network
+    volumes:
+      - ./public:/app/public:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  whatsapp-network:
+    driver: bridge
