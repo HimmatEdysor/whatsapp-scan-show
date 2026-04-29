@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import QRCode from 'qrcode.react';
 import { Loader2, Check, AlertCircle } from 'lucide-react';
@@ -13,7 +13,6 @@ interface QRCodeComponentProps {
 export default function QRCodeComponent({ onQRGenerated, onScanComplete }: QRCodeComponentProps) {
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'generating' | 'waiting' | 'scanned'>('idle');
   const [error, setError] = useState<string | null>(null);
 
@@ -33,7 +32,6 @@ export default function QRCodeComponent({ onQRGenerated, onScanComplete }: QRCod
       }
 
       const data = await response.json();
-      setSessionId(data.sessionId);
       setQrCode(data.qrCode);
       onQRGenerated(data.sessionId);
       setStatus('waiting');

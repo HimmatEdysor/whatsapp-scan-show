@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState } from 'react';
 import QRCodeComponent from '@/components/QRCode';
 import InboxView from '@/components/InboxView';
 import Header from '@/components/Header';
@@ -9,7 +8,6 @@ import Header from '@/components/Header';
 export default function Home() {
   const [stage, setStage] = useState<'scan' | 'inbox'>('scan');
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
 
   const handleQRGenerated = (id: string) => {
     setSessionId(id);

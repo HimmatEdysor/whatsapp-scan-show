@@ -92,7 +92,7 @@ export default function InboxView({ sessionId, onBackToScan }: InboxViewProps) {
     }
   };
 
-  const fetchMessages = async (chatId: string) => {
+  const fetchMessages = async (_chatId: string) => {
     try {
       // Simulate API call
       const mockMessages: Message[] = [
