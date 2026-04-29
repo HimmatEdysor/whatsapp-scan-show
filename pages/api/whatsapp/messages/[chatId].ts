@@ -11,7 +11,7 @@ type ResponseData = {
   error: string;
 };
 
-export default function handler(
+export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ResponseData>
 ) {
@@ -20,30 +20,44 @@ export default function handler(
   }
 
   const { chatId } = req.query;
+  const { sessionId } = req.query;
 
-  if (!chatId) {
-    return res.status(400).json({ error: 'Chat ID required' });
+  if (!chatId || !sessionId) {
+    return res.status(400).json({ error: 'Chat ID and Session ID required' });
   }
 
   try {
-    // In production, this would fetch messages from the Wuz API
-    const messages = [
-      {
-        id: '1',
-        sender: 'John Doe',
-        content: 'Hey! How are you doing?',
-        timestamp: '10:30 AM',
-      },
-      {
-        id: '2',
-        sender: 'You',
-        content: 'Great! Just finished the project review.',
-        timestamp: '10:31 AM',
-      },
-    ];
+    const wuzApiUrl = process.env.NEXT_PUBLIC_WUZ_API_BASE_URL || 'https://wuzapi.guaranteeadmit.com';
+    const wuzApiKey = process.env.WUZ_API_KEY;
 
-    res.status(200).json({ messages });
+    if (!wuzApiKey) {
+      return res.status(500).json({ error: 'Wuz API key not configured' });
+    }
+
+    // Call real Wuz API to fetch messages
+    const response = await fetch(
+      `${wuzApiUrl}/sessions/${sessionId}/chats/${chatId}/messages`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${wuzApiKey}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Wuz API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    res.status(200).json({ 
+      messages: data.messages || [] 
+    });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch messages' });
+    console.error('Messages fetch error:', error);
+    res.status(500).json({ 
+      error: error instanceof Error ? error.message : 'Failed to fetch messages' 
+    });
   }
 }

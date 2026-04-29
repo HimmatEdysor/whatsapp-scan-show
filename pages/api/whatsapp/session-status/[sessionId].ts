@@ -8,7 +8,7 @@ type ResponseData = {
   error: string;
 };
 
-export default function handler(
+export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ResponseData>
 ) {
@@ -23,16 +23,43 @@ export default function handler(
   }
 
   try {
-    // In production, this would call the Wuz API to check session status
-    // For now, simulate a connection after a delay
-    const isConnected = Math.random() > 0.7; // 30% chance of connection
+    const wuzApiUrl = process.env.NEXT_PUBLIC_WUZ_API_BASE_URL || 'https://wuzapi.guaranteeadmit.com';
+    const wuzApiKey = process.env.WUZ_API_KEY;
+
+    if (!wuzApiKey) {
+      return res.status(500).json({ error: 'Wuz API key not configured' });
+    }
+
+    // Call real Wuz API to check session status
+    const response = await fetch(`${wuzApiUrl}/sessions/${sessionId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${wuzApiKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      // Session not found or expired
+      return res.status(200).json({
+        sessionId: sessionId as string,
+        isConnected: false,
+        status: 'waiting',
+      });
+    }
+
+    const data = await response.json();
 
     res.status(200).json({
       sessionId: sessionId as string,
-      isConnected,
-      status: isConnected ? 'connected' : 'waiting',
+      isConnected: data.status === 'connected',
+      status: data.status || 'waiting',
     });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to check session status' });
+    console.error('Session status check error:', error);
+    res.status(200).json({
+      sessionId: sessionId as string,
+      isConnected: false,
+      status: 'waiting',
+    });
   }
 }

@@ -1,8 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 type ResponseData = {
-  sessionId: string;
-  qrCode: string;
+  chats: Array<{
+    id: string;
+    name: string;
+    lastMessage: string;
+    timestamp: string;
+    unread: number;
+    avatar: string;
+  }>;
 } | {
   error: string;
 };
@@ -11,8 +17,14 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ResponseData>
 ) {
-  if (req.method !== 'POST') {
+  if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { sessionId } = req.query;
+
+  if (!sessionId) {
+    return res.status(400).json({ error: 'Session ID required' });
   }
 
   try {
@@ -23,12 +35,11 @@ export default async function handler(
       return res.status(500).json({ error: 'Wuz API key not configured' });
     }
 
-    // Call real Wuz API to generate QR
-    const response = await fetch(`${wuzApiUrl}/sessions/generate`, {
-      method: 'POST',
+    // Call real Wuz API to fetch chats
+    const response = await fetch(`${wuzApiUrl}/sessions/${sessionId}/chats`, {
+      method: 'GET',
       headers: {
         'Authorization': `Bearer ${wuzApiKey}`,
-        'Content-Type': 'application/json',
       },
     });
 
@@ -38,14 +49,13 @@ export default async function handler(
 
     const data = await response.json();
 
-    res.status(200).json({
-      sessionId: data.sessionId,
-      qrCode: data.qrCode,
+    res.status(200).json({ 
+      chats: data.chats || [] 
     });
   } catch (error) {
-    console.error('QR generation error:', error);
+    console.error('Chats fetch error:', error);
     res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Failed to generate QR code' 
+      error: error instanceof Error ? error.message : 'Failed to fetch chats' 
     });
   }
 }

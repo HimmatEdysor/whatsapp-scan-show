@@ -39,52 +39,23 @@ export default function InboxView({ sessionId, onBackToScan }: InboxViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    // Load chats
-    fetchChats();
+    if (sessionId) {
+      fetchChats();
+    }
   }, [sessionId]);
 
   const fetchChats = async () => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      const mockChats: Chat[] = [
-        {
-          id: '1',
-          name: 'John Doe',
-          lastMessage: 'Hey! How are you?',
-          timestamp: '2 min ago',
-          unread: 2,
-          avatar: '👨‍💼',
-          isActive: true,
-        },
-        {
-          id: '2',
-          name: 'Design Team',
-          lastMessage: 'UI looks great! 🎨',
-          timestamp: '15 min ago',
-          unread: 0,
-          avatar: '👥',
-        },
-        {
-          id: '3',
-          name: 'Mom',
-          lastMessage: 'Call me when you can',
-          timestamp: '1 hour ago',
-          unread: 1,
-          avatar: '👩',
-        },
-        {
-          id: '4',
-          name: 'Project Manager',
-          lastMessage: 'Meeting at 3 PM',
-          timestamp: '3 hours ago',
-          unread: 0,
-          avatar: '👨‍💼',
-        },
-      ];
-      setChats(mockChats);
-      setSelectedChat(mockChats[0]);
-      fetchMessages(mockChats[0].id);
+      const response = await fetch(`/api/whatsapp/chats?sessionId=${sessionId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setChats(data.chats || []);
+        if (data.chats && data.chats.length > 0) {
+          setSelectedChat(data.chats[0]);
+          fetchMessages(data.chats[0].id);
+        }
+      }
     } catch (err) {
       console.error('Failed to fetch chats:', err);
     } finally {
@@ -92,60 +63,13 @@ export default function InboxView({ sessionId, onBackToScan }: InboxViewProps) {
     }
   };
 
-  const fetchMessages = async (_chatId: string) => {
+  const fetchMessages = async (chatId: string) => {
     try {
-      // Simulate API call
-      const mockMessages: Message[] = [
-        {
-          id: '1',
-          sender: 'John Doe',
-          content: 'Hey! How are you doing?',
-          timestamp: '10:30 AM',
-          isOwn: false,
-          avatar: '👨‍💼',
-        },
-        {
-          id: '2',
-          sender: 'You',
-          content: 'Great! Just finished the project review.',
-          timestamp: '10:31 AM',
-          isOwn: true,
-          avatar: '😊',
-        },
-        {
-          id: '3',
-          sender: 'John Doe',
-          content: 'Awesome! The team is impressed with the results 🎉',
-          timestamp: '10:32 AM',
-          isOwn: false,
-          avatar: '👨‍💼',
-        },
-        {
-          id: '4',
-          sender: 'You',
-          content: 'Thanks! Looking forward to the next phase.',
-          timestamp: '10:33 AM',
-          isOwn: true,
-          avatar: '😊',
-        },
-        {
-          id: '5',
-          sender: 'John Doe',
-          content: 'Let\'s sync tomorrow at 2 PM?',
-          timestamp: '10:35 AM',
-          isOwn: false,
-          avatar: '👨‍💼',
-        },
-        {
-          id: '6',
-          sender: 'You',
-          content: 'Sure! Works for me. See you then! 👍',
-          timestamp: '10:36 AM',
-          isOwn: true,
-          avatar: '😊',
-        },
-      ];
-      setMessages(mockMessages);
+      const response = await fetch(`/api/whatsapp/messages/${chatId}?sessionId=${sessionId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setMessages(data.messages || []);
+      }
     } catch (err) {
       console.error('Failed to fetch messages:', err);
     }
@@ -158,32 +82,27 @@ export default function InboxView({ sessionId, onBackToScan }: InboxViewProps) {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageInput.trim()) return;
+    if (!messageInput.trim() || !selectedChat) return;
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      sender: 'You',
-      content: messageInput,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isOwn: true,
-      avatar: '😊',
-    };
+    try {
+      const response = await fetch('/api/whatsapp/messages/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          chatId: selectedChat.id,
+          message: messageInput,
+        }),
+      });
 
-    setMessages([...messages, newMessage]);
-    setMessageInput('');
-
-    // Simulate API call
-    setTimeout(() => {
-      const replyMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        sender: selectedChat?.name || 'User',
-        content: 'Thanks for your message! 😊',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isOwn: false,
-        avatar: selectedChat?.avatar || '👤',
-      };
-      setMessages(prev => [...prev, replyMessage]);
-    }, 1000);
+      if (response.ok) {
+        setMessageInput('');
+        // Refresh messages
+        fetchMessages(selectedChat.id);
+      }
+    } catch (err) {
+      console.error('Failed to send message:', err);
+    }
   };
 
   const filteredChats = chats.filter(chat =>
@@ -261,13 +180,19 @@ export default function InboxView({ sessionId, onBackToScan }: InboxViewProps) {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2 custom-scrollbar">
             <AnimatePresence mode="popLayout">
-              {messages.map((message, idx) => (
-                <MessageBubble
-                  key={message.id}
-                  message={message}
-                  delay={idx * 0.05}
-                />
-              ))}
+              {messages.length > 0 ? (
+                messages.map((message, idx) => (
+                  <MessageBubble
+                    key={message.id}
+                    message={message}
+                    delay={idx * 0.05}
+                  />
+                ))
+              ) : (
+                <div className="flex items-center justify-center h-full text-slate-400">
+                  <p>No messages yet. Start the conversation!</p>
+                </div>
+              )}
             </AnimatePresence>
           </div>
 
