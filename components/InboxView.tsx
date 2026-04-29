@@ -41,6 +41,9 @@ export default function InboxView({ sessionId, onBackToScan }: InboxViewProps) {
   useEffect(() => {
     if (sessionId) {
       fetchChats();
+      // Auto-refresh chats every 30 seconds
+      const interval = setInterval(() => fetchChats(), 30000);
+      return () => clearInterval(interval);
     }
   }, [sessionId]);
 
