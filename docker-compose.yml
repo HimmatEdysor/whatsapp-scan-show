@@ -1,6 +1,51 @@
 version: '3.8'
 
 services:
+  wuzapi-db:
+    image: postgres:16
+    container_name: wuzapi-db
+    environment:
+      - POSTGRES_USER=wuzapi
+      - POSTGRES_PASSWORD=wuzapi
+      - POSTGRES_DB=wuzapi
+    volumes:
+      - wuzapi_db:/var/lib/postgresql/data
+    networks:
+      - whatsapp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wuzapi -d wuzapi"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  wuzapi:
+    image: asternic/wuzapi:latest
+    container_name: wuzapi
+    depends_on:
+      wuzapi-db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_USER=wuzapi
+      - DB_PASSWORD=wuzapi
+      - DB_NAME=wuzapi
+      - DB_HOST=wuzapi-db
+      - DB_PORT=5432
+      # Set these in a local .env (compose env file) so they persist across restarts
+      - WUZAPI_ADMIN_TOKEN=${WUZAPI_ADMIN_TOKEN:-admin_himmat6376721036}
+      - WUZAPI_GLOBAL_ENCRYPTION_KEY=${WUZAPI_GLOBAL_ENCRYPTION_KEY:-change_me_32_chars_minimum________}
+      - WUZAPI_GLOBAL_HMAC_KEY=${WUZAPI_GLOBAL_HMAC_KEY:-change_me_32_chars_minimum______________}
+    networks:
+      - whatsapp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/session/status"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
   whatsapp-app:
     build: .
     container_name: whatsapp-scan-show
@@ -8,8 +53,11 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_WUZ_API_BASE_URL=${WUZ_API_BASE_URL:-https://wuzapi.guaranteeadmit.com}
-      - WUZ_API_KEY=${WUZ_API_KEY}
+      # App reads either WUZAPI_BASE_URL/WUZAPI_TOKEN (preferred) or NEXT_PUBLIC_WUZ_API_BASE_URL/WUZ_API_KEY (legacy)
+      - WUZAPI_BASE_URL=${WUZAPI_BASE_URL:-http://wuzapi:8080}
+      - WUZAPI_TOKEN=${WUZAPI_TOKEN:-himmat6376721036}
+      - NEXT_PUBLIC_WUZ_API_BASE_URL=${WUZAPI_BASE_URL:-http://wuzapi:8080}
+      - WUZ_API_KEY=${WUZAPI_TOKEN:-himmat6376721036}
     restart: unless-stopped
     networks:
       - whatsapp-network
@@ -25,3 +73,6 @@ services:
 networks:
   whatsapp-network:
     driver: bridge
+
+volumes:
+  wuzapi_db:

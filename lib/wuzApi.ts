@@ -1,129 +1,74 @@
-// Utility functions for API interactions with Wuz API
+type Json = Record<string, any>;
 
-const WUZ_API_BASE_URL = process.env.NEXT_PUBLIC_WUZ_API_BASE_URL || 'https://wuzapi.guaranteeadmit.com';
-const WUZ_API_KEY = process.env.WUZ_API_KEY;
-
-export async function generateQRCode() {
-  try {
-    const response = await fetch(`${WUZ_API_BASE_URL}/sessions/generate`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${WUZ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to generate QR: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error generating QR:', error);
-    throw error;
-  }
+function baseUrl(): string {
+  const base = process.env.WUZAPI_BASE_URL || process.env.NEXT_PUBLIC_WUZ_API_BASE_URL || '';
+  if (!base) throw new Error('WUZAPI_BASE_URL is missing');
+  return base.endsWith('/') ? base.slice(0, -1) : base;
 }
 
-export async function checkSessionStatus(sessionId: string) {
-  try {
-    const response = await fetch(`${WUZ_API_BASE_URL}/sessions/${sessionId}/status`, {
-      headers: {
-        'Authorization': `Bearer ${WUZ_API_KEY}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to check status: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error checking session status:', error);
-    throw error;
-  }
+function token(): string {
+  const t = process.env.WUZAPI_TOKEN || process.env.WUZ_API_KEY || '';
+  if (!t) throw new Error('WUZAPI_TOKEN is missing');
+  return t;
 }
 
-export async function getChats(sessionId: string) {
-  try {
-    const response = await fetch(`${WUZ_API_BASE_URL}/sessions/${sessionId}/chats`, {
-      headers: {
-        'Authorization': `Bearer ${WUZ_API_KEY}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to get chats: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.chats || [];
-  } catch (error) {
-    console.error('Error fetching chats:', error);
-    throw error;
-  }
+async function wuzFetch(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(`${baseUrl()}${path}`, {
+    ...init,
+    headers: {
+      Token: token(),
+      'Content-Type': 'application/json',
+      ...(init?.headers || {}),
+    },
+  });
 }
 
-export async function getMessages(sessionId: string, chatId: string) {
-  try {
-    const response = await fetch(
-      `${WUZ_API_BASE_URL}/sessions/${sessionId}/chats/${chatId}/messages`,
-      {
-        headers: {
-          'Authorization': `Bearer ${WUZ_API_KEY}`,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to get messages: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.messages || [];
-  } catch (error) {
-    console.error('Error fetching messages:', error);
-    throw error;
-  }
+export async function connectSession(): Promise<void> {
+  await wuzFetch('/session/connect', {
+    method: 'POST',
+    body: JSON.stringify({ Subscribe: ['Message'], Immediate: true }),
+  });
 }
 
-export async function sendMessage(
-  sessionId: string,
-  chatId: string,
-  message: string
-) {
-  try {
-    const response = await fetch(
-      `${WUZ_API_BASE_URL}/sessions/${sessionId}/chats/${chatId}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${WUZ_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message }),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to send message: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error sending message:', error);
-    throw error;
-  }
+export async function getQr(): Promise<string> {
+  const res = await wuzFetch('/session/qr', { method: 'GET' });
+  if (!res.ok) throw new Error(`WUZAPI /session/qr failed: ${res.status}`);
+  const data: Json = await res.json();
+  return data.data?.QRCode || data.QRCode || '';
 }
 
-export async function testAPIConnection() {
-  try {
-    const response = await fetch(`${WUZ_API_BASE_URL}/health`);
-    return response.ok;
-  } catch (error) {
-    console.error('API connection failed:', error);
-    return false;
-  }
+export async function getStatus(): Promise<{ connected: boolean; phone?: string }> {
+  const res = await wuzFetch('/session/status', { method: 'GET' });
+  if (!res.ok) return { connected: false };
+  const data: Json = await res.json();
+  const s = data.data || data;
+  const connected = Boolean(s.LoggedIn || s.Connected);
+  return { connected, phone: s.Jid };
 }
+
+export async function getContacts(): Promise<Record<string, any>> {
+  const res = await wuzFetch('/user/contacts', { method: 'GET' });
+  if (!res.ok) throw new Error(`WUZAPI /user/contacts failed: ${res.status}`);
+  const data: Json = await res.json();
+  return data.data || data || {};
+}
+
+export async function getChatHistory(chatId: string): Promise<any[]> {
+  const url = `/chat/history?Phone=${encodeURIComponent(chatId)}`;
+  const res = await wuzFetch(url, { method: 'GET' });
+  if (!res.ok) return [];
+  const data: Json = await res.json();
+  return data.data || data.messages || [];
+}
+
+export async function sendText(chatId: string, message: string): Promise<string | undefined> {
+  const phone = String(chatId).split('@')[0];
+  const res = await wuzFetch('/chat/send/text', {
+    method: 'POST',
+    body: JSON.stringify({ Phone: phone, Body: message }),
+  });
+  if (!res.ok) throw new Error(`WUZAPI send failed: ${res.status}`);
+  const data: Json = await res.json();
+  return data.data?.Id || data.Id;
+}
+

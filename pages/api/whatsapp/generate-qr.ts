@@ -1,8 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { connectSession, getQr, getStatus } from '@/lib/wuzApi';
 
 type ResponseData = {
   sessionId: string;
   qrCode: string;
+  isConnected: boolean;
 } | {
   error: string;
 };
@@ -16,36 +18,21 @@ export default async function handler(
   }
 
   try {
-    const wuzApiUrl = process.env.NEXT_PUBLIC_WUZ_API_BASE_URL || 'https://wuzapi.guaranteeadmit.com';
-    const wuzApiKey = process.env.WUZ_API_KEY;
+    const sessionId = 'wuzapi';
+    await connectSession();
+    const qrCode = await getQr();
+    const status = await getStatus();
 
-    if (!wuzApiKey) {
-      return res.status(500).json({ error: 'Wuz API key not configured' });
-    }
-
-    // Call real Wuz API to generate QR
-    const response = await fetch(`${wuzApiUrl}/sessions/generate`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${wuzApiKey}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Wuz API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-
-    res.status(200).json({
-      sessionId: data.sessionId,
-      qrCode: data.qrCode,
+    return res.status(200).json({
+      sessionId,
+      qrCode,
+      isConnected: status.connected,
     });
   } catch (error) {
-    console.error('QR generation error:', error);
-    res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Failed to generate QR code' 
+    return res.status(200).json({
+      sessionId: 'wuzapi',
+      qrCode: '',
+      isConnected: false,
     });
   }
 }

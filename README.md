@@ -50,8 +50,8 @@ npm install
 
 3. Create `.env.local` file:
 ```env
-NEXT_PUBLIC_WUZ_API_BASE_URL=https://wuzapi.guaranteeadmit.com
-WUZ_API_KEY=your_api_key_here
+WUZAPI_BASE_URL=http://localhost:8080
+WUZAPI_TOKEN=your_user_token_here
 ```
 
 ## Development
@@ -69,6 +69,40 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 npm run build
 npm start
 ```
+
+## Self-host Wuz API (Docker Compose)
+
+This repo ships a `docker-compose.yml` that can run **Wuz API + Postgres + the Next.js app**.
+
+1. Create a `.env` (for docker compose) in the project root:
+
+```env
+WUZAPI_ADMIN_TOKEN=change_me_admin_token
+WUZAPI_GLOBAL_ENCRYPTION_KEY=change_me_32_chars_min
+WUZAPI_GLOBAL_HMAC_KEY=change_me_32_chars_min
+
+# Token used by this app to call Wuz API
+WUZAPI_TOKEN=change_me_user_token
+
+# Optional: override base URL inside the app container (default points to http://wuzapi:8080)
+WUZAPI_BASE_URL=http://wuzapi:8080
+```
+
+2. Start everything:
+
+```bash
+docker compose up -d --build
+```
+
+3. Create the user token in Wuz API (run once):
+
+```bash
+curl -X POST "http://localhost:8080/admin/users" \
+  -H "Authorization: change_me_admin_token" -H "Content-Type: application/json" \
+  --data '{"name":"crm","token":"change_me_user_token","events":"Message"}'
+```
+
+4. Open the app at `http://localhost:3000` and scan the QR.
 
 ## Project Structure
 
@@ -151,8 +185,8 @@ Replace mock data in components with real API calls to your backend.
 
 ## Environment Variables
 
-- `NEXT_PUBLIC_WUZ_API_BASE_URL` - Wuz API base URL
-- `WUZ_API_KEY` - API authentication key
+- `WUZAPI_BASE_URL` - Wuz API base URL (server-side)
+- `WUZAPI_TOKEN` - Wuz API user token (server-side)
 
 ## Browser Support
 

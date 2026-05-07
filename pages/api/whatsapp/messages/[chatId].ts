@@ -1,13 +1,16 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { getChatHistory } from '@/lib/wuzApi';
+
+type Message = {
+  id: string;
+  sender: string;
+  content: string;
+  timestamp: string;
+  isOwn: boolean;
+};
 
 type ResponseData = {
-  messages: Array<{
-    id: string;
-    sender: string;
-    content: string;
-    timestamp: string;
-    isOwn?: boolean;
-  }>;
+  messages: Message[];
 } | {
   error: string;
 };
@@ -21,115 +24,24 @@ export default async function handler(
   }
 
   const { chatId } = req.query;
-  const { sessionId } = req.query;
 
-  if (!chatId || !sessionId) {
-    return res.status(400).json({ error: 'Chat ID and Session ID required' });
+  if (!chatId) {
+    return res.status(400).json({ error: 'Chat ID required' });
   }
 
   try {
-    const wuzApiUrl = process.env.NEXT_PUBLIC_WUZ_API_BASE_URL || 'https://wuzapi.guaranteeadmit.com';
-    const wuzApiKey = process.env.WUZ_API_KEY;
-
-    if (!wuzApiKey) {
-      return res.status(500).json({ error: 'Wuz API key not configured' });
-    }
-
-    // Call real Wuz API to fetch messages
-    const response = await fetch(
-      `${wuzApiUrl}/sessions/${sessionId}/chats/${chatId}/messages`,
-      {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${wuzApiKey}`,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      // Return default messages if API fails
-      return res.status(200).json({ 
-        messages: getDefaultMessages(chatId as string)
-      });
-    }
-
-    const data = await response.json();
-
-    // If no messages, return default messages
-    if (!data.messages || data.messages.length === 0) {
-      return res.status(200).json({ 
-        messages: getDefaultMessages(chatId as string)
-      });
-    }
-
-    res.status(200).json({ 
-      messages: data.messages || [] 
-    });
-  } catch (error) {
-    console.error('Messages fetch error:', error);
-    // Return default messages on error
-    return res.status(200).json({ 
-      messages: getDefaultMessages(chatId as string)
-    });
+    const raw = await getChatHistory(String(chatId));
+    const messages: Message[] = raw.map((m: any, idx: number) => ({
+      id: m.id || m._id || m._serialized || `msg-${idx}`,
+      sender: m.IsFromMe ? 'You' : m.Sender || m.From || 'Unknown',
+      content: m.Body || m.Text || '',
+      timestamp: m.Timestamp
+        ? new Date(Number(m.Timestamp) * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : 'Now',
+      isOwn: Boolean(m.IsFromMe),
+    }));
+    return res.status(200).json({ messages });
+  } catch {
+    return res.status(200).json({ messages: [] });
   }
-}
-
-function getDefaultMessages(chatId: string) {
-  const defaultMessagesByChat: { [key: string]: any[] } = {
-    'default-1': [
-      {
-        id: '1',
-        sender: 'Support Team',
-        content: 'Welcome to WhatsApp Hub! 👋',
-        timestamp: '12:00 PM',
-        isOwn: false,
-      },
-      {
-        id: '2',
-        sender: 'You',
-        content: 'Thanks! Looking forward to using this.',
-        timestamp: '12:01 PM',
-        isOwn: true,
-      },
-      {
-        id: '3',
-        sender: 'Support Team',
-        content: 'How can we help you today?',
-        timestamp: '12:02 PM',
-        isOwn: false,
-      },
-      {
-        id: '4',
-        sender: 'You',
-        content: 'I want to integrate WhatsApp messaging with my CRM',
-        timestamp: '12:03 PM',
-        isOwn: true,
-      },
-      {
-        id: '5',
-        sender: 'Support Team',
-        content: 'Great! We can help with that. Let me connect you to our team.',
-        timestamp: '12:04 PM',
-        isOwn: false,
-      },
-    ],
-    'default-2': [
-      {
-        id: '1',
-        sender: 'Updates Channel',
-        content: '🎉 New Features Released!',
-        timestamp: '10:00 AM',
-        isOwn: false,
-      },
-      {
-        id: '2',
-        sender: 'Updates Channel',
-        content: '✅ Auto-connect to WhatsApp\n✅ Real-time message sync\n✅ Better UI/UX',
-        timestamp: '10:01 AM',
-        isOwn: false,
-      },
-    ],
-  };
-
-  return defaultMessagesByChat[chatId] || defaultMessagesByChat['default-1'];
 }

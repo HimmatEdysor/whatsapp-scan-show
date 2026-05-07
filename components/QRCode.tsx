@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import QRCode from 'qrcode.react';
-import { Loader2, Check, AlertCircle } from 'lucide-react';
+import { Loader2, Check, AlertCircle, RefreshCw } from 'lucide-react';
 
 interface QRCodeComponentProps {
   onQRGenerated: (sessionId: string) => void;
@@ -12,31 +11,56 @@ interface QRCodeComponentProps {
 
 export default function QRCodeComponent({ onQRGenerated, onScanComplete }: QRCodeComponentProps) {
   const [qrCode, setQrCode] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [status, setStatus] = useState<'idle' | 'generating' | 'waiting' | 'scanned'>('idle');
   const [error, setError] = useState<string | null>(null);
+
+  // Auto-generate QR on component mount
+  useEffect(() => {
+    generateQR();
+  }, []);
 
   const generateQR = async () => {
     setIsGenerating(true);
     setStatus('generating');
     setError(null);
+    setQrCode(null);
 
     try {
-      // Simulate API call to Wuz API
       const response = await fetch('/api/whatsapp/generate-qr', {
         method: 'POST',
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to generate QR code');
+        throw new Error(data.error || 'Failed to generate QR code');
       }
 
-      const data = await response.json();
+      setSessionId(data.sessionId);
+
+      // If connected, move directly.
+      if (data.isConnected) {
+        onQRGenerated(data.sessionId);
+        setStatus('scanned');
+        setTimeout(() => onScanComplete(), 500);
+        return;
+      }
+
+      // If no QR returned, stop spinner and show a clear message.
+      // This happens when Wuz API is not running / not reachable / misconfigured.
+      if (!data.qrCode) {
+        setStatus('idle');
+        setError(
+          'QR not available. Start Wuz API and set WUZAPI_BASE_URL + WUZAPI_TOKEN in .env.local (then restart npm run dev).',
+        );
+        return;
+      }
+
       setQrCode(data.qrCode);
       onQRGenerated(data.sessionId);
       setStatus('waiting');
-
-      // Simulate polling for scan completion
       pollForScanCompletion(data.sessionId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -62,9 +86,9 @@ export default function QRCodeComponent({ onQRGenerated, onScanComplete }: QRCod
       } catch (err) {
         console.error('Poll error:', err);
       }
-    }, 1000);
+    }, 2000);
 
-    // Clear interval after 2 minutes
+    // Clear interval after 2 minutes (QR codes typically expire)
     setTimeout(() => clearInterval(interval), 120000);
   };
 
@@ -107,7 +131,7 @@ export default function QRCodeComponent({ onQRGenerated, onScanComplete }: QRCod
               <span className="gradient-text">Connect Your WhatsApp</span>
             </h2>
             <p className="text-lg text-slate-300 leading-relaxed">
-              Scan the QR code with your phone to link your WhatsApp account. Your messages will appear instantly.
+              Use one of the methods below to connect WhatsApp in CRM.
             </p>
           </motion.div>
 
@@ -118,11 +142,11 @@ export default function QRCodeComponent({ onQRGenerated, onScanComplete }: QRCod
             transition={{ delay: 0.3 }}
           >
             {[
-              { step: 1, text: 'Click Generate QR button' },
-              { step: 2, text: 'Open WhatsApp on your phone' },
-              { step: 3, text: 'Settings → Linked Devices' },
-              { step: 4, text: 'Scan the QR code' },
-              { step: 5, text: 'View your chats instantly' },
+              { step: 1, text: 'Open WhatsApp Web in browser' },
+              { step: 2, text: 'On phone: WhatsApp → Linked Devices' },
+              { step: 3, text: 'Tap Link a Device' },
+              { step: 4, text: 'Scan WhatsApp Web QR on web.whatsapp.com' },
+              { step: 5, text: 'Return to CRM and click Continue' },
             ].map((item) => (
               <div key={item.step} className="flex gap-4">
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center">
@@ -137,14 +161,44 @@ export default function QRCodeComponent({ onQRGenerated, onScanComplete }: QRCod
 
           {error && (
             <motion.div
-              className="flex gap-3 p-4 bg-red-500/20 border border-red-500/40 rounded-lg"
+              className="flex gap-3 p-4 bg-amber-500/15 border border-amber-500/30 rounded-lg"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
             >
-              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-              <span className="text-red-200 text-sm">{error}</span>
+              <AlertCircle className="w-5 h-5 text-amber-300 flex-shrink-0" />
+              <div className="space-y-1">
+                <p className="text-amber-100 text-sm font-medium">QR not available yet</p>
+                <p className="text-amber-200/80 text-xs leading-relaxed">
+                  {error}
+                </p>
+                <p className="text-amber-200/70 text-xs">
+                  Start Wuz API and set <code className="text-amber-100">WUZAPI_BASE_URL</code> + <code className="text-amber-100">WUZAPI_TOKEN</code> in <code className="text-amber-100">.env.local</code>, then restart <code className="text-amber-100">npm run dev</code>.
+                </p>
+              </div>
             </motion.div>
           )}
+
+          <div className="space-y-3">
+            <a
+              href="https://web.whatsapp.com/"
+              target="_blank"
+              rel="noreferrer"
+              className="block text-center px-4 py-3 rounded-xl bg-green-500 text-white font-semibold"
+            >
+              Open WhatsApp Web
+            </a>
+            <button
+              onClick={() => {
+                if (!sessionId) return;
+                onQRGenerated(sessionId);
+                onScanComplete();
+              }}
+              disabled={!sessionId}
+              className="w-full text-center px-4 py-3 rounded-xl bg-white/10 text-white font-semibold disabled:opacity-50"
+            >
+              Continue in CRM
+            </button>
+          </div>
         </div>
 
         {/* Right Side - QR Code */}
@@ -155,26 +209,36 @@ export default function QRCodeComponent({ onQRGenerated, onScanComplete }: QRCod
           transition={{ delay: 0.4 }}
         >
           {!qrCode ? (
-            <motion.button
-              onClick={generateQR}
-              disabled={isGenerating}
-              className="group relative px-8 py-4 bg-gradient-to-r from-green-400 to-emerald-600 text-white font-bold text-lg rounded-2xl hover:shadow-2xl hover:shadow-green-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+            <motion.div
+              className="text-center space-y-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
             >
-              <span className="flex items-center gap-2">
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    Generate QR Code
-                  </>
-                )}
-              </span>
-            </motion.button>
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                className="inline-block"
+              >
+                <Loader2 className={`w-16 h-16 ${isGenerating ? 'text-green-400' : 'text-slate-600'}`} />
+              </motion.div>
+              <p className="text-slate-300 text-lg">
+                {isGenerating ? 'Generating QR Code...' : error ? 'QR not available' : 'Connecting to WhatsApp...'}
+              </p>
+              {error && (
+                <div className="space-y-3">
+                  <div className="text-xs text-slate-400 max-w-sm mx-auto">
+                    {error}
+                  </div>
+                  <button
+                    onClick={generateQR}
+                    className="px-6 py-3 bg-gradient-to-r from-green-400 to-emerald-600 text-white font-bold rounded-xl hover:shadow-lg flex items-center gap-2 mx-auto"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Retry
+                  </button>
+                </div>
+              )}
+            </motion.div>
           ) : (
             <motion.div
               className="space-y-6"
@@ -189,14 +253,31 @@ export default function QRCodeComponent({ onQRGenerated, onScanComplete }: QRCod
                 animate={status === 'waiting' ? 'animate' : undefined}
               >
                 <div className="p-4 bg-white rounded-2xl">
-                  <QRCode
-                    value={qrCode}
-                    size={256}
-                    level="H"
-                    includeMargin={true}
-                  />
+                  {/* Display QR from Wuz API (base64 image) */}
+                  {qrCode.startsWith('data:image') || qrCode.startsWith('iVBOR') ? (
+                    <img
+                      src={qrCode.startsWith('data:image') ? qrCode : `data:image/png;base64,${qrCode}`}
+                      alt="WhatsApp QR Code"
+                      width={256}
+                      height={256}
+                      className="block"
+                    />
+                  ) : (
+                    <div className="w-64 h-64 flex items-center justify-center text-slate-600 text-sm text-center p-4">
+                      QR Code data: {qrCode.substring(0, 50)}...
+                    </div>
+                  )}
                 </div>
               </motion.div>
+
+              {/* Refresh QR Button */}
+              <button
+                onClick={generateQR}
+                className="text-sm text-green-400 hover:text-green-300 flex items-center gap-2 mx-auto"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Refresh QR Code
+              </button>
 
               {/* Status Indicator */}
               <div className="space-y-3">

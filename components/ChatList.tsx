@@ -17,6 +17,10 @@ interface ChatListProps {
   selectedChat: Chat | null;
   onSelectChat: (chat: Chat) => void;
   isLoading: boolean;
+  onlineUsers: Record<string, boolean>;
+  hasMore: boolean;
+  isLoadingMore: boolean;
+  onListScroll: (event: React.UIEvent<HTMLDivElement>) => void;
 }
 
 export default function ChatList({
@@ -24,6 +28,10 @@ export default function ChatList({
   selectedChat,
   onSelectChat,
   isLoading,
+  onlineUsers,
+  hasMore,
+  isLoadingMore,
+  onListScroll,
 }: ChatListProps) {
   if (isLoading) {
     return (
@@ -48,7 +56,10 @@ export default function ChatList({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar">
+    <div
+      className="flex-1 overflow-y-auto space-y-2 custom-scrollbar"
+      onScroll={onListScroll}
+    >
       <AnimatePresence>
         {chats.map((chat, idx) => (
           <motion.button
@@ -69,7 +80,14 @@ export default function ChatList({
               <div className="flex-shrink-0 text-2xl pt-1">{chat.avatar}</div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-white truncate">{chat.name}</h4>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                        onlineUsers[chat.id] ? 'bg-green-400' : 'bg-slate-500'
+                      }`}
+                    />
+                    <h4 className="font-semibold text-white truncate">{chat.name}</h4>
+                  </div>
                   <span className="text-xs text-slate-400 flex-shrink-0 ml-2">
                     {chat.timestamp}
                   </span>
@@ -85,6 +103,14 @@ export default function ChatList({
           </motion.button>
         ))}
       </AnimatePresence>
+      {isLoadingMore && (
+        <div className="py-3 flex items-center justify-center">
+          <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
+        </div>
+      )}
+      {!hasMore && chats.length > 0 && (
+        <p className="text-[11px] text-slate-500 text-center py-2">All chats loaded</p>
+      )}
     </div>
   );
 }
