@@ -54,9 +54,10 @@ services:
     environment:
       - NODE_ENV=production
       # App reads either WUZAPI_BASE_URL/WUZAPI_TOKEN (preferred) or NEXT_PUBLIC_WUZ_API_BASE_URL/WUZ_API_KEY (legacy)
-      - WUZAPI_BASE_URL=${WUZAPI_BASE_URL:-http://wuzapi:8080}
+      # Hosted API base (so /session/disconnect -> https://whatsapp.guaranteeadmit.com/api/session/disconnect)
+      - WUZAPI_BASE_URL=${WUZAPI_BASE_URL:-https://whatsapp.guaranteeadmit.com/api}
       - WUZAPI_TOKEN=${WUZAPI_TOKEN:-himmat6376721036}
-      - NEXT_PUBLIC_WUZ_API_BASE_URL=${WUZAPI_BASE_URL:-http://wuzapi:8080}
+      - NEXT_PUBLIC_WUZ_API_BASE_URL=${WUZAPI_BASE_URL:-https://whatsapp.guaranteeadmit.com/api}
       - WUZ_API_KEY=${WUZAPI_TOKEN:-himmat6376721036}
     restart: unless-stopped
     networks:
