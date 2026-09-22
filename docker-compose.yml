@@ -20,7 +20,8 @@ services:
       retries: 10
 
   wuzapi:
-    image: asternic/wuzapi:latest
+    # Pin >=1.0.9 — 1.0.6 drops Connect without a QR (WhatsApp "Client outdated" 405).
+    image: asternic/wuzapi:v1.0.9
     container_name: wuzapi
     depends_on:
       wuzapi-db:
