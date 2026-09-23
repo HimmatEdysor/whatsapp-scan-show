@@ -26,10 +26,12 @@ export default async function handler(
 
   try {
     const status = await getStatus();
+    const connected = Boolean(status.loggedIn || status.connected);
     return res.status(200).json({
       sessionId: sessionId as string,
-      isConnected: status.connected,
-      status: status.connected ? 'connected' : 'waiting',
+      // Only treat as scanned when WhatsApp login completed (not mere websocket connect).
+      isConnected: Boolean(status.loggedIn),
+      status: status.loggedIn ? 'connected' : connected ? 'waiting' : 'waiting',
       phone: status.phone,
     });
   } catch {
