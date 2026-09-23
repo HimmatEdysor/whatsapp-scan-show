@@ -5,11 +5,12 @@ import { motion } from 'framer-motion';
 import { Loader2, Check, AlertCircle, RefreshCw } from 'lucide-react';
 
 interface QRCodeComponentProps {
-  onQRGenerated: (sessionId: string) => void;
+  onQRGenerated: (sessionId: string, meta?: { baseUrl?: string }) => void;
   onScanComplete: () => void;
+  onBaseUrl?: (url: string) => void;
 }
 
-export default function QRCodeComponent({ onQRGenerated, onScanComplete }: QRCodeComponentProps) {
+export default function QRCodeComponent({ onQRGenerated, onScanComplete, onBaseUrl }: QRCodeComponentProps) {
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -51,7 +52,10 @@ export default function QRCodeComponent({ onQRGenerated, onScanComplete }: QRCod
       });
 
       const data = await response.json();
-      if (data.baseUrl) setBaseUrl(data.baseUrl);
+      if (data.baseUrl) {
+        setBaseUrl(data.baseUrl);
+        onBaseUrl?.(data.baseUrl);
+      }
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to generate QR code');
@@ -61,7 +65,7 @@ export default function QRCodeComponent({ onQRGenerated, onScanComplete }: QRCod
 
       if (data.isConnected || data.loggedIn) {
         scannedRef.current = true;
-        onQRGenerated(data.sessionId);
+        onQRGenerated(data.sessionId, { baseUrl: data.baseUrl });
         setStatus('scanned');
         setTimeout(() => onScanComplete(), 500);
         return;
@@ -77,7 +81,7 @@ export default function QRCodeComponent({ onQRGenerated, onScanComplete }: QRCod
       }
 
       setQrCode(data.qrCode);
-      onQRGenerated(data.sessionId);
+      onQRGenerated(data.sessionId, { baseUrl: data.baseUrl });
       setStatus('waiting');
       pollForScanCompletion(data.sessionId);
 
