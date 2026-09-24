@@ -1,50 +1,22 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { getChatHistory } from '@/lib/wuzApi';
+import re
 
-type Message = {
-  id: string;
-  sender: string;
-  content: string;
-  timestamp: string;
-  isOwn: boolean;
-};
+with open('pages/api/whatsapp/messages/[chatId].ts', 'r') as f:
+    content = f.read()
 
-type CallHistory = {
+# Replace CallHistory type
+content = re.sub(
+    r'type CallHistory = \{[\s\S]*?\};',
+    '''type CallHistory = {
   totalCalls: number;
   firstCallTime: string | null;
   lastCallTime: string | null;
   calls: any[];
-};
+};''',
+    content
+)
 
-type ResponseData = {
-  messages: Message[];
-  callHistory?: CallHistory;
-} | {
-  error: string;
-};
-
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse<ResponseData>
-) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  const { chatId } = req.query;
-
-  if (!chatId) {
-    return res.status(400).json({ error: 'Chat ID required' });
-  }
-
-  try {
-    const raw = await getChatHistory(String(chatId));
-    
-    let totalCalls = 0;
-    let firstCallTimestamp = Infinity;
-    let lastCallTimestamp = 0;
-    
-    
+# Replace raw.map logic
+new_map = '''
     const calls: any[] = [];
     const messages: Message[] = raw.map((m: any, idx: number) => {
       // Determine if it's a call event (works for various Baileys/whatsmeow representations)
@@ -92,17 +64,23 @@ export default async function handler(
         isOwn: Boolean(m.IsFromMe),
       };
     });
+'''
+content = re.sub(
+    r'const messages: Message\[\] = raw\.map\(\(m: any, idx: number\) => \{[\s\S]*?\}\);',
+    new_map,
+    content
+)
 
-    
-    const callHistory = {
-      totalCalls,
-      firstCallTime: firstCallTimestamp !== Infinity ? new Date(firstCallTimestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null,
-      lastCallTime: lastCallTimestamp !== 0 ? new Date(lastCallTimestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null,
-      calls,
-    };
-    
-    return res.status(200).json({ messages, callHistory });
-  } catch {
-    return res.status(200).json({ messages: [], callHistory: { totalCalls: 0, firstCallTime: null, lastCallTime: null, calls: [] } });
-  }
-}
+# Add calls to callHistory response
+content = content.replace(
+    'lastCallTime: lastCallTimestamp !== 0 ? new Date(lastCallTimestamp * 1000).toLocaleTimeString([], { hour: \'2-digit\', minute: \'2-digit\' }) : null,',
+    'lastCallTime: lastCallTimestamp !== 0 ? new Date(lastCallTimestamp * 1000).toLocaleTimeString([], { hour: \'2-digit\', minute: \'2-digit\' }) : null,\n      calls,'
+)
+
+content = content.replace(
+    'callHistory: { totalCalls: 0, firstCallTime: null, lastCallTime: null }',
+    'callHistory: { totalCalls: 0, firstCallTime: null, lastCallTime: null, calls: [] }'
+)
+
+with open('pages/api/whatsapp/messages/[chatId].ts', 'w') as f:
+    f.write(content)
