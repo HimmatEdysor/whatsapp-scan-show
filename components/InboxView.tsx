@@ -37,6 +37,7 @@ export default function InboxView({ sessionId, onDisconnect }: InboxViewProps) {
   const [isLoadingMoreChats, setIsLoadingMoreChats] = useState(false);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [callHistory, setCallHistory] = useState<{ totalCalls: number; firstCallTime: string | null; lastCallTime: string | null; } | null>(null);
   const [messageInput, setMessageInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
@@ -169,9 +170,11 @@ export default function InboxView({ sessionId, onDisconnect }: InboxViewProps) {
       }));
       
       setMessages(realMessages);
+      setCallHistory(data.callHistory || null);
     } catch (err) {
       console.error('Failed to fetch messages:', err);
       setMessages([]);
+      setCallHistory(null);
     } finally {
       setIsLoadingMessages(false);
     }
@@ -347,6 +350,13 @@ export default function InboxView({ sessionId, onDisconnect }: InboxViewProps) {
                 <p className={onlineUsers[selectedChat.id] ? 'text-xs text-green-400' : 'text-xs text-slate-400'}>
                   ● {onlineUsers[selectedChat.id] ? 'Active' : 'Offline'}
                 </p>
+                {callHistory && callHistory.totalCalls > 0 && (
+                  <p className="text-xs text-blue-400 mt-1 flex items-center gap-1">
+                    <Phone className="w-3 h-3" />
+                    {callHistory.totalCalls} Calls 
+                    {callHistory.lastCallTime && ` (Last: ${callHistory.lastCallTime})`}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex gap-2">
