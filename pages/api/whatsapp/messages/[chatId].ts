@@ -101,6 +101,18 @@ export default async function handler(
       calls,
     };
     
+    // Fire and forget sync to B2B_CRM
+    if (calls.length > 0) {
+      fetch("http://127.0.0.1:8000/api/webhook/wuz/sync-history-calls", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          wa_id: String(chatId).replace(/[^0-9]/g, ""),
+          calls: calls
+        })
+      }).catch(err => console.error("Failed to sync calls:", err));
+    }
+
     return res.status(200).json({ messages, callHistory });
   } catch {
     return res.status(200).json({ messages: [], callHistory: { totalCalls: 0, firstCallTime: null, lastCallTime: null, calls: [] } });
