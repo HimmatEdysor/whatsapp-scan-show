@@ -52,7 +52,7 @@ services:
     build: .
     container_name: whatsapp-scan-show
     ports:
-      - "3000:3000"
+      - "3002:3002"
     environment:
       - NODE_ENV=production
       # App reads either WUZAPI_BASE_URL/WUZAPI_TOKEN (preferred) or NEXT_PUBLIC_WUZ_API_BASE_URL/WUZ_API_KEY (legacy)
@@ -66,8 +66,9 @@ services:
       - whatsapp-network
     volumes:
       - ./public:/app/public:ro
+      - whatsapp_calls:/app/.data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      test: ["CMD", "curl", "-f", "http://localhost:3002"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -79,3 +80,4 @@ networks:
 
 volumes:
   wuzapi_db:
+  whatsapp_calls:
