@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Send, Search, Phone, Paperclip, Loader2, MessageCircle } from 'lucide-react';
 import MessageBubble from './MessageBubble';
 import ChatList from './ChatList';
+import CallList, { type CallItem } from './CallList';
 
 interface InboxViewProps {
   sessionId: string | null;
@@ -32,12 +33,14 @@ interface Chat {
 
 export default function InboxView({ sessionId, onDisconnect }: InboxViewProps) {
   const CHAT_PAGE_SIZE = 50;
+  const [activeTab, setActiveTab] = useState<'chats' | 'calls'>('chats');
+  const [calls, setCalls] = useState<CallItem[]>([]);
+  const [isLoadingCalls, setIsLoadingCalls] = useState(false);
   const [chats, setChats] = useState<Chat[]>([]);
   const [visibleChatsCount, setVisibleChatsCount] = useState(CHAT_PAGE_SIZE);
   const [isLoadingMoreChats, setIsLoadingMoreChats] = useState(false);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [callHistory, setCallHistory] = useState<{ totalCalls: number; firstCallTime: string | null; lastCallTime: string | null; } | null>(null);
   const [messageInput, setMessageInput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
@@ -158,6 +161,27 @@ export default function InboxView({ sessionId, onDisconnect }: InboxViewProps) {
     }
   };
 
+  const fetchCalls = async () => {
+    setIsLoadingCalls(true);
+    try {
+      const response = await fetch('/api/whatsapp/calls');
+      const data = await response.json();
+      setCalls(data.calls || []);
+    } catch (err) {
+      console.error('Failed to fetch calls:', err);
+    } finally {
+      setIsLoadingCalls(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!sessionId) return;
+    fetchCalls();
+    // Poll calls so newly received call events show up without a manual refresh.
+    const interval = setInterval(() => fetchCalls(), 15000);
+    return () => clearInterval(interval);
+  }, [sessionId]);
+
   const fetchMessages = async (chatId: string) => {
     setIsLoadingMessages(true);
     try {
@@ -170,11 +194,9 @@ export default function InboxView({ sessionId, onDisconnect }: InboxViewProps) {
       }));
       
       setMessages(realMessages);
-      setCallHistory(data.callHistory || null);
     } catch (err) {
       console.error('Failed to fetch messages:', err);
       setMessages([]);
-      setCallHistory(null);
     } finally {
       setIsLoadingMessages(false);
     }
@@ -290,17 +312,44 @@ export default function InboxView({ sessionId, onDisconnect }: InboxViewProps) {
           <span className="text-sm">Disconnect WhatsApp</span>
         </button>
 
-        {/* Search Bar */}
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search chats..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-green-500/50"
-          />
+        {/* Tabs: Chats / Calls */}
+        <div className="flex gap-1 mb-4 bg-white/5 rounded-xl p-1">
+          <button
+            onClick={() => setActiveTab('chats')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'chats' ? 'bg-white/15 text-white' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <MessageCircle className="w-4 h-4" /> Chats
+          </button>
+          <button
+            onClick={() => setActiveTab('calls')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'calls' ? 'bg-white/15 text-white' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Phone className="w-4 h-4" /> Calls
+            {calls.length > 0 && (
+              <span className="text-[10px] bg-green-500/30 text-green-200 rounded-full px-1.5">
+                {calls.length}
+              </span>
+            )}
+          </button>
         </div>
+
+        {/* Search Bar (chats only) */}
+        {activeTab === 'chats' && (
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search chats..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-green-500/50"
+            />
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 p-3 bg-red-500/20 border border-red-500/40 rounded-lg">
@@ -308,8 +357,9 @@ export default function InboxView({ sessionId, onDisconnect }: InboxViewProps) {
           </div>
         )}
 
-        {/* Chats List */}
-        {chats.length === 0 && !isLoading ? (
+        {activeTab === 'calls' ? (
+          <CallList calls={calls} isLoading={isLoadingCalls && calls.length === 0} />
+        ) : chats.length === 0 && !isLoading ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center space-y-3 px-6">
               <MessageCircle className="w-12 h-12 text-slate-600 mx-auto" />
@@ -350,13 +400,6 @@ export default function InboxView({ sessionId, onDisconnect }: InboxViewProps) {
                 <p className={onlineUsers[selectedChat.id] ? 'text-xs text-green-400' : 'text-xs text-slate-400'}>
                   ● {onlineUsers[selectedChat.id] ? 'Active' : 'Offline'}
                 </p>
-                {callHistory && callHistory.totalCalls > 0 && (
-                  <p className="text-xs text-blue-400 mt-1 flex items-center gap-1">
-                    <Phone className="w-3 h-3" />
-                    {callHistory.totalCalls} Calls 
-                    {callHistory.lastCallTime && ` (Last: ${callHistory.lastCallTime})`}
-                  </p>
-                )}
               </div>
             </div>
             <div className="flex gap-2">
