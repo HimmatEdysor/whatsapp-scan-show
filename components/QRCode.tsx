@@ -12,7 +12,6 @@ interface QRCodeComponentProps {
 
 export default function QRCodeComponent({ onQRGenerated, onScanComplete, onBaseUrl }: QRCodeComponentProps) {
   const [qrCode, setQrCode] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [status, setStatus] = useState<'idle' | 'generating' | 'waiting' | 'scanned'>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -60,8 +59,6 @@ export default function QRCodeComponent({ onQRGenerated, onScanComplete, onBaseU
       if (!response.ok) {
         throw new Error(data.error || 'Failed to generate QR code');
       }
-
-      setSessionId(data.sessionId);
 
       if (data.isConnected || data.loggedIn) {
         scannedRef.current = true;
